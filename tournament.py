@@ -5,8 +5,6 @@
 
 import psycopg2
 
-TOURNAMENT = "1"
-
 def connect():
     """Connect to the PostgreSQL database.  Returns a database connection."""
     return psycopg2.connect("dbname=tournament")
@@ -25,7 +23,6 @@ def deletePlayers():
     """Remove all the player records from the database."""
     connection = connect()
     cursor = connection.cursor()
-    cursor.execute("DELETE FROM contestant;")
     cursor.execute("DELETE FROM player;")
     connection.commit()
     connection.close()
@@ -35,26 +32,22 @@ def countPlayers():
     """Returns the number of players currently registered."""
     connection = connect()
     cursor = connection.cursor()
-    cursor.execute("SELECT COUNT(*) FROM contestant") ## WHERE TournamentID = %s;", (TOURNAMENT,))
+    cursor.execute("SELECT COUNT(*) FROM player;")
     player_count = int(cursor.fetchone()[0])
     connection.close()
     return player_count
 
 
 def registerPlayer(name):
-    """Adds a player to the tournament database.
-  
-    The database assigns a unique serial id number for the player.  (This
-    should be handled by your SQL database schema, not in your Python code.)
-  
+    """Adds a player to the tournament database. 
+    The database assigns a unique serial id number for the player.
+    
     Args:
       name: the player's full name (need not be unique).
     """
     connection = connect()
     cursor = connection.cursor()
     cursor.execute("INSERT INTO player (Name) VALUES (%s) RETURNING PlayerID;", (name,))
-    player_id = cursor.fetchone()[0]
-    cursor.execute("INSERT INTO contestant (PlayerID, TournamentID) VALUES (%s, %s)", (player_id, TOURNAMENT))
     connection.commit()
     connection.close()
 
@@ -74,15 +67,16 @@ def playerStandings():
     """
     connection = connect()
     cursor = connection.cursor()
-    cursor.execute("SELECT contestant.PlayerID, player.name, \
-                    COUNT(CASE contest.Winner WHEN contestant.ContestantID THEN 1 END) AS wins, \
-                    COUNT(CASE WHEN contestant.ContestantID = contest.Winner OR contestant.ContestantID = contest.Loser THEN 1 END) AS matches \
-                    FROM contestant \
-                    LEFT JOIN contest ON contestant.ContestantID = contest.Winner OR contestant.ContestantID = contest.Loser \
-                    LEFT JOIN player ON contestant.PlayerID = player.PlayerID \
-                    GROUP BY contestant.ContestantID, player.name \
-                    ORDER BY wins DESC;")  ##                     WHERE contest.TournamentID = %s \
-
+    
+    cursor.execute("SELECT player.PlayerID, player.name, \
+                    COUNT(CASE contest.Winner WHEN player.PlayerID THEN 1 END) as wins, \
+                    COUNT(CASE WHEN player.PlayerID = contest.Winner \
+                               OR player.PlayerID = contest.Loser THEN 1 END) as matches \
+                    FROM player \
+                    LEFT JOIN contest ON player.PlayerID = contest.Winner \
+                                      OR player.PlayerID = contest.Loser \
+                    GROUP BY player.PlayerID, player.name \
+                    ORDER BY wins DESC;")
     standings = cursor.fetchall()
     connection.close()
     return standings
@@ -97,7 +91,7 @@ def reportMatch(winner, loser):
     """
     connection = connect()
     cursor = connection.cursor()
-    cursor.execute("INSERT INTO contest (TournamentID, Winner, Loser) VALUES (%s, %s, %s)", (TOURNAMENT, winner, loser))
+    cursor.execute("INSERT INTO contest (Winner, Loser) VALUES (%s, %s);", (winner, loser))
     connection.commit()
     connection.close()
  
@@ -124,4 +118,3 @@ def swissPairings():
         oddStanding = standings[i+1]
         pairings.append((evenStanding[0], evenStanding[1], oddStanding[0], oddStanding[1]))
     return pairings
-
