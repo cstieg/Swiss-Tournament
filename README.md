@@ -12,7 +12,7 @@ win/loss records.
 * _tournament.sql_ contains the SQL statements to create the database and tables.
 * _tournament.py_ contains the code to add, count, and delete players; record
 or delete match results; and return the pairings for the next round.
-* _tournament_test.py_ is the test suite provided by Udacity to check proper functionality.
+* _tournament\_test.py_ is the test suite provided by Udacity to check proper functionality.
 
 ## Getting Started
 * Make sure [Python](https://www.python.org/downloads/) 2.7 is installed.
