@@ -4,16 +4,21 @@
 #
 
 import psycopg2
+from appengine.api.search.ExpressionLexer import NUMBER
 
 def connect():
-    """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=tournament")
+    """Connect to the PostgreSQL database.  Returns a database cursor."""
+    try:
+        connection = psycopg2.connect("dbname=tournament")
+        cursor = connection.cursor()
+        return connection, cursor
+    except:
+        print "ERROR: Could not connect to the database!"
 
 
 def deleteMatches():
     """Remove all the match records from the database."""
-    connection = connect()
-    cursor = connection.cursor()
+    connection, cursor = connect()
     cursor.execute("DELETE FROM contest;")
     connection.commit()
     connection.close()
@@ -21,8 +26,7 @@ def deleteMatches():
 
 def deletePlayers():
     """Remove all the player records from the database."""
-    connection = connect()
-    cursor = connection.cursor()
+    connection, cursor = connect()
     cursor.execute("DELETE FROM player;")
     connection.commit()
     connection.close()
@@ -30,8 +34,7 @@ def deletePlayers():
 
 def countPlayers():
     """Returns the number of players currently registered."""
-    connection = connect()
-    cursor = connection.cursor()
+    connection, cursor = connect()
     cursor.execute("SELECT COUNT(*) FROM player;")
     player_count = int(cursor.fetchone()[0])
     connection.close()
@@ -45,8 +48,7 @@ def registerPlayer(name):
     Args:
       name: the player's full name (need not be unique).
     """
-    connection = connect()
-    cursor = connection.cursor()
+    connection, cursor = connect()
     cursor.execute("INSERT INTO player (Name) VALUES (%s) RETURNING PlayerID;", (name,))
     connection.commit()
     connection.close()
@@ -65,18 +67,8 @@ def playerStandings():
         wins: the number of matches the player has won
         matches: the number of matches the player has played
     """
-    connection = connect()
-    cursor = connection.cursor()
-    
-    cursor.execute("SELECT player.PlayerID, player.name, \
-                    COUNT(CASE contest.Winner WHEN player.PlayerID THEN 1 END) as wins, \
-                    COUNT(CASE WHEN player.PlayerID = contest.Winner \
-                               OR player.PlayerID = contest.Loser THEN 1 END) as matches \
-                    FROM player \
-                    LEFT JOIN contest ON player.PlayerID = contest.Winner \
-                                      OR player.PlayerID = contest.Loser \
-                    GROUP BY player.PlayerID, player.name \
-                    ORDER BY wins DESC;")
+    connection, cursor = connect()
+    cursor.execute("SELECT * FROM player_standings")
     standings = cursor.fetchall()
     connection.close()
     return standings
@@ -89,8 +81,7 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
-    connection = connect()
-    cursor = connection.cursor()
+    connection, cursor = connect()
     cursor.execute("INSERT INTO contest (Winner, Loser) VALUES (%s, %s);", (winner, loser))
     connection.commit()
     connection.close()
@@ -112,8 +103,11 @@ def swissPairings():
         name2: the second player's name
     """
     standings = playerStandings()
+    number_of_players = len(standings)
+    if number_of_players % 2 != 0:
+        print "ERROR: Must have even number of players!"
     pairings = []
-    for i in xrange(0, len(standings), 2):
+    for i in xrange(0, number_of_players, 2):
         evenStanding = standings[i]
         oddStanding = standings[i+1]
         pairings.append((evenStanding[0], evenStanding[1], oddStanding[0], oddStanding[1]))
